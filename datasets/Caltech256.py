@@ -24,11 +24,8 @@ class Caltech256(Dataset):
     def __getitem__(self, idx):
         item = self.samples[idx]
 
-        img_path = os.path.join(
-            self.data_root,
-            item["image_path"].lstrip("\\/")
-        )
-
+        rel_path = item["image_path"].replace("\\", "/").lstrip("/")
+        img_path = os.path.join(self.data_root, rel_path)
         img = Image.open(img_path).convert("RGB")
         label = int(item["label_id"])
 
