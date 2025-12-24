@@ -151,15 +151,6 @@ class Trainer(Module):
             lambda step: min((step + 1) / warmup_steps, 1.0)
         )
 
-        # EMA (only on main process)
-        self.ema_model = None
-        if self.accelerator.is_main_process:
-            self.ema_model = EMA(
-                model,
-                beta=ema_decay,
-                forward_method_names=('forward',)
-            )
-
         # prepare distributed
         prepare_objs = [self.model, self.optim,
                         self.train_loader, self.scheduler]
@@ -169,6 +160,15 @@ class Trainer(Module):
             *prepare_objs[:4])
         if exists(self.val_loader):
             self.val_loader = self.accelerator.prepare(self.val_loader)
+
+        # EMA (only on main process)
+        self.ema_model = None
+        if self.accelerator.is_main_process:
+            self.ema_model = EMA(
+                model,
+                beta=ema_decay,
+                forward_method_names=('forward',)
+            )
 
         self.logger = None
         if self.accelerator.is_main_process:
