@@ -216,7 +216,7 @@ class Trainer(Module):
                 # train_metrics_state["all_logits"].append(logits.detach())
                 # train_metrics_state["all_labels"].append(labels.detach())
 
-                # ---- TRAIN METRICS (KHÔNG LƯU TENSOR) ----
+                # ---- TRAIN METRICS ----
                 preds = logits.argmax(dim=-1)
                 correct += (preds == labels).sum().item()
                 total += labels.numel()
@@ -224,11 +224,11 @@ class Trainer(Module):
                 # logging train step every 20 steps
                 if step % 20 == 0:
                     # compute train metrics
-                    all_logits = torch.cat(train_metrics_state["all_logits"])
-                    all_labels = torch.cat(train_metrics_state["all_labels"])
-                    train_metrics = classification_metrics(
-                        all_logits, all_labels, self.model.num_classes)
-
+                    # all_logits = torch.cat(train_metrics_state["all_logits"])
+                    # all_labels = torch.cat(train_metrics_state["all_labels"])
+                    # train_metrics = classification_metrics(
+                    #     all_logits, all_labels, self.model.num_classes)
+                    train_acc = correct / max(total, 1)
                     msg = (
                         f"[Epoch {epoch}] Step {step} | "
                         f"loss: {total_loss.item():.4f} | "
@@ -239,7 +239,7 @@ class Trainer(Module):
                     self.accelerator.print(msg)
                     if exists(self.logger):
                         self.logger.info(msg)
-                
+
             # Evaluate at end of epoch
             if exists(self.val_loader):
                 val_metrics = self.evaluate()
