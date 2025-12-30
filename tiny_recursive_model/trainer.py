@@ -178,16 +178,22 @@ class Trainer(Module):
         self.model.eval()
         all_logits = []
         all_labels = []
-        for images, labels in self.val_loader:
-            images, labels = images.to(
-                self.model.device), labels.to(self.model.device)
-            logits, _ = self.model(images)
-            all_logits.append(logits.cpu())
-            all_labels.append(labels.cpu())
+        with torch.no_grad():
+            for images, labels in self.val_loader:
+                images = images.to(self.model.device, non_blocking=True)
+                labels = labels.to(self.model.device, non_blocking=True)
+
+                logits, *_ = self.model(images)
+                all_logits.append(logits.cpu())
+                all_labels.append(labels.cpu())
+
         all_logits = torch.cat(all_logits, dim=0)
         all_labels = torch.cat(all_labels, dim=0)
         metrics = classification_metrics(
             all_logits, all_labels, self.model.num_classes)
+
+        del all_logits, all_labels
+        torch.cuda.empty_cache()
         return metrics
 
     def forward(self):
