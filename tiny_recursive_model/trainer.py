@@ -182,26 +182,24 @@ class Trainer(Module):
             images, labels = images.to(
                 self.model.device), labels.to(self.model.device)
             logits, _ = self.model(images)
-            all_logits.append(logits)
-            all_labels.append(labels)
-        all_logits = torch.cat(all_logits)
-        all_labels = torch.cat(all_labels)
+            all_logits.append(logits.cpu())
+            all_labels.append(labels.cpu())
+        all_logits = torch.cat(all_logits, dim=0)
+        all_labels = torch.cat(all_labels, dim=0)
         metrics = classification_metrics(
             all_logits, all_labels, self.model.num_classes)
         return metrics
 
     def forward(self):
-        self.model.train()
         for epoch in range_from_one(self.epochs):
-            train_metrics_state = {
-                "all_logits": [],
-                "all_labels": []
-            }
+            self.model.train()
+            correct = 0
+            total = 0
 
             for step, (images, labels) in enumerate(self.train_loader):
                 images, labels = images.to(
                     self.model.device), labels.to(self.model.device)
-                total_loss, cls_loss, halt_loss = self.model(
+                total_loss, cls_loss, halt_loss, logits, halt_logits = self.model(
                     images, labels=labels)
 
                 # backward
@@ -213,10 +211,15 @@ class Trainer(Module):
                 if exists(self.ema_model) and self.accelerator.is_main_process:
                     self.ema_model.update()
 
-                # collect logits and labels for train metrics
-                logits, _ = self.model(images)
-                train_metrics_state["all_logits"].append(logits.detach())
-                train_metrics_state["all_labels"].append(labels.detach())
+                # # collect logits and labels for train metrics
+                # logits, _ = self.model(images)
+                # train_metrics_state["all_logits"].append(logits.detach())
+                # train_metrics_state["all_labels"].append(labels.detach())
+
+                # ---- TRAIN METRICS (KHÔNG LƯU TENSOR) ----
+                preds = logits.argmax(dim=-1)
+                correct += (preds == labels).sum().item()
+                total += labels.numel()
 
                 # logging train step every 20 steps
                 if step % 20 == 0:
@@ -231,15 +234,12 @@ class Trainer(Module):
                         f"loss: {total_loss.item():.4f} | "
                         f"cls_loss: {cls_loss.item():.4f} | "
                         f"halt_loss: {halt_loss.item():.4f} | "
-                        f"train_acc: {train_metrics['acc']:.4f} | "
-                        f"train_precision: {train_metrics['precision']:.4f} | "
-                        f"train_recall: {train_metrics['recall']:.4f} | "
-                        f"train_f1: {train_metrics['f1']:.4f}"
+                        f"train_acc: {train_acc:.4f}"
                     )
                     self.accelerator.print(msg)
                     if exists(self.logger):
                         self.logger.info(msg)
-
+                
             # Evaluate at end of epoch
             if exists(self.val_loader):
                 val_metrics = self.evaluate()

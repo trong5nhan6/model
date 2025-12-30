@@ -244,7 +244,7 @@ class TinyRecursiveModel(Module):
         )
 
         total_loss = cls_loss + halt_loss * self.halt_loss_weight
-        return total_loss, cls_loss, halt_loss
+        return total_loss, cls_loss, halt_loss, logits, halt_logits.sigmoid()
 
         # registers, outputs_for_pred = unpack(outputs, packed_shape, 'b * d')
 
