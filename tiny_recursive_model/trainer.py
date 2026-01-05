@@ -202,8 +202,13 @@ class Trainer(Module):
     def forward(self):
         for epoch in range_from_one(self.epochs):
             self.model.train()
-            correct = 0
-            total = 0
+            # ====== EPOCH ACCUMULATORS ======
+            epoch_loss = 0.0
+            epoch_cls = 0.0
+            epoch_halt = 0.0
+            epoch_active = 0.0
+            epoch_halt_prob = 0.0
+            epoch_batches = 0
 
             for step, (images, labels) in enumerate(self.train_loader):
                 images, labels = images.to(
@@ -218,7 +223,12 @@ class Trainer(Module):
                 active_images = images
                 active_labels = labels
 
-                total_loss_step = 0.0
+                # ---- COLLECT STEP STATS ----
+                step_losses = []
+                step_cls_losses = []
+                step_halt_losses = []
+                step_active = []
+                step_halt_probs = []
 
                 for t in range(self.max_recurrent_steps):
                     if active_images.numel() == 0:
@@ -229,17 +239,22 @@ class Trainer(Module):
 
                     self.accelerator.backward(total_loss)
 
-                    total_loss_step += total_loss.detach()
+                    # collect stats
+                    step_losses.append(total_loss.detach())
+                    step_cls_losses.append(cls_loss.detach())
+                    step_halt_losses.append(halt_loss.detach())
+                    step_active.append(active_images.shape[0])
+                    step_halt_probs.append(halt_probs.mean().detach())
 
-                    # LOG MỖI STEP
-                    self.accelerator.print(
-                        f"[Epoch {epoch}] "
-                        f"[Step {t+1}/{self.max_recurrent_steps}] "
-                        f"loss={total_loss.item():.4f} | "
-                        f"cls={cls_loss.item():.4f} | "
-                        f"halt={halt_loss.item():.4f} | "
-                        f"active={active_images.shape[0]}"
-            )
+                    # # LOG MỖI STEP
+                    # self.accelerator.print(
+                    #     f"[Epoch {epoch}] "
+                    #     f"[Step {t+1}/{self.max_recurrent_steps}] "
+                    #     f"loss={total_loss.item():.4f} | "
+                    #     f"cls={cls_loss.item():.4f} | "
+                    #     f"halt={halt_loss.item():.4f} | "
+                    #     f"active={active_images.shape[0]}"
+            # )
 
                     # -------- HALTING --------
                     halt_mask = halt_probs >= self.halt_prob_thres
@@ -256,29 +271,28 @@ class Trainer(Module):
                 if exists(self.ema_model) and self.accelerator.is_main_process:
                     self.ema_model.update()
 
-                # # collect logits and labels for train metrics
-                # logits, _ = self.model(images)
-                # train_metrics_state["all_logits"].append(logits.detach())
-                # train_metrics_state["all_labels"].append(labels.detach())
+                # ====== ACCUMULATE EPOCH STATS ======
+                if len(step_losses) > 0:
+                    epoch_loss += torch.stack(step_losses).mean().item()
+                    epoch_cls += torch.stack(step_cls_losses).mean().item()
+                    epoch_halt += torch.stack(step_halt_losses).mean().item()
+                    epoch_active += sum(step_active) / len(step_active)
+                    epoch_halt_prob += torch.stack(step_halt_probs).mean().item()
+                    epoch_batches += 1  
 
-                # ---- TRAIN METRICS ----
-                # preds = logits.argmax(dim=-1)
-                # correct += (preds == labels).sum().item()
-                # total += labels.numel()
-
-                # logging train step every 20 steps
-                # if step % 20 == 0:
-                #     train_acc = correct / max(total, 1)
-                #     msg = (
-                #         f"[Epoch {epoch}] Step {step} | "
-                #         f"loss: {total_loss.item():.4f} | "
-                #         f"cls_loss: {cls_loss.item():.4f} | "
-                #         f"halt_loss: {halt_loss.item():.4f} | "
-                #         f"train_acc: {train_acc:.4f}"
-                #     )
-                #     self.accelerator.print(msg)
-                #     if exists(self.logger):
-                #         self.logger.info(msg)
+            # ====== TRAIN LOG (ONCE / EPOCH) ======
+            if self.accelerator.is_main_process:
+                msg = (
+                    f"[Epoch {epoch}] Train | "
+                    f"loss={epoch_loss/epoch_batches:.4f} | "
+                    f"cls={epoch_cls/epoch_batches:.4f} | "
+                    f"halt={epoch_halt/epoch_batches:.4f} | "
+                    f"avg_active={epoch_active/epoch_batches:.2f} | "
+                    f"mean_halt_prob={epoch_halt_prob/epoch_batches:.3f}"
+                )
+                self.accelerator.print(msg)
+                if exists(self.logger):
+                    self.logger.info(msg)
 
             # Evaluate at end of epoch
             if exists(self.val_loader):
