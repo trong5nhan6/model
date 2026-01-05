@@ -113,10 +113,9 @@ def evaluate(model, dataloader, halt_prob_thres=0.7, max_deep_refinement_steps=6
     all_labels = torch.cat(all_labels, dim=0)
     all_exit_steps = torch.cat(all_exit_steps, dim=0)
 
-    metrics = compute_metrics_from_preds(
-        preds=all_preds,
+    metrics = classification_metrics(
+        logits=all_preds,
         labels=all_labels,
-        exit_steps=all_exit_steps,
         num_classes=model.num_classes
     )
 
@@ -243,11 +242,6 @@ class Trainer(Module):
             for step, (images, labels) in enumerate(self.train_loader):
                 images, labels = images.to(
                     self.model.device), labels.to(self.model.device)
-                # total_loss, cls_loss, halt_loss, logits, halt_logits = self.model(
-                #     images, labels=labels)
-
-                # backward
-                # self.accelerator.backward(total_loss)
 
                 # -------- INIT --------
                 active_images = images
@@ -302,10 +296,10 @@ class Trainer(Module):
                         continue
 
                     # remove halted samples
-                    outputs = outputs[~halt_mask]
-                    latents = latents[~halt_mask]
-                    active_images = active_images[~halt_mask]
-                    active_labels = active_labels[~halt_mask]
+                    outputs = outputs[~halt_mask] # (B, 1, D)
+                    latents = latents[~halt_mask] # (B, 1, D)
+                    active_images = active_images[~halt_mask] # (B, C, H, W)
+                    active_labels = active_labels[~halt_mask] # (B,)
 
                     if is_empty(outputs):
                         break

@@ -38,48 +38,31 @@ class TinyRecursiveModel(Module):
         patch_size=16,
         in_chans=3,
         num_classes,
-        # num_tokens,
         network: Module,
         num_refinement_blocks = 3,   # T in paper
         num_latent_refinements = 6,  # n in paper - 1 output refinement per N latent refinements
         halt_loss_weight = 1.,
-        # num_register_tokens = 0
     ):
         super().__init__()
         assert num_refinement_blocks > 1
 
         self.patch_embed = PatchEmbed(img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=dim)
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
-        self.output_init_embed = nn.Parameter(torch.randn(1, 1, dim))
-        self.latent_init_embed = nn.Parameter(torch.randn(1, 1, dim))
+        self.output_init_embed = nn.Parameter(torch.randn(dim) * 1e-2)
+        self.latent_init_embed = nn.Parameter(torch.randn(dim) * 1e-2)
         self.num_classes = num_classes
-        # self.output_init_embed = nn.Parameter(torch.randn(dim) * 1e-2)
-        # self.latent_init_embed = nn.Parameter(torch.randn(dim) * 1e-2)
 
         self.network = network
 
         self.num_latent_refinements = num_latent_refinements
         self.num_refinement_blocks = num_refinement_blocks
 
-        # register tokens for the self attend version
-
-        # self.register_tokens = nn.Parameter(torch.randn(num_register_tokens, dim) * 1e-2)
-
         # prediction heads
         self.to_pred = nn.Linear(dim, num_classes)
         self.to_halt_pred = nn.Linear(dim, 1)
-
-        # self.to_pred = nn.Linear(dim, num_tokens, bias = False)
-        # self.to_halt_pred = nn.Sequential(
-        #     Reduce('b n d -> b d', 'mean'),
-        #     nn.Linear(dim, 1, bias = False),
-        #     Rearrange('... 1 -> ...')
-        # )
-
         self.halt_loss_weight = halt_loss_weight
 
         # init
-
         nn.init.zeros_(self.to_halt_pred.weight)
 
     @property
@@ -91,17 +74,6 @@ class TinyRecursiveModel(Module):
         latents = self.latent_init_embed
 
         return outputs, latents
-
-    # def embed_inputs_with_registers(
-    #     self,
-    #     seq
-    # ):
-    #     batch = seq.shape[0]
-    #     inputs = self.input_embed(seq)
-    #     # maybe registers
-    #     registers = repeat(self.register_tokens, 'n d -> b n d', b = batch)
-    #     inputs, packed_shape = pack([registers, inputs], 'b * d')
-    #     return inputs, packed_shape
 
     def refine_latent_then_output_once(
         self,
@@ -170,8 +142,6 @@ class TinyRecursiveModel(Module):
         # Initial outputs and latents
         # ------------------------------------------------
         outputs, latents = self.get_initial()
-        # outputs = outputs.expand(batch, -1, -1)
-        # latents = latents.expand(batch, -1, -1)
 
         # ------------------------------------------------
         # ACT bookkeeping (GIỐNG repo)
@@ -212,17 +182,16 @@ class TinyRecursiveModel(Module):
             # ------------------------------------------------
             # Remove halted samples
             # ------------------------------------------------
-            keep = ~should_halt
-            inputs = inputs[keep]
-            outputs = outputs[keep]
-            latents = latents[keep]
-            active_batch_indices = active_batch_indices[keep]
+            inputs = inputs[~should_halt]
+            outputs = outputs[~should_halt]
+            latents = latents[~should_halt]
+            active_batch_indices = active_batch_indices[~should_halt]
 
             if inputs.numel() == 0:
                 break
 
         # ------------------------------------------------
-        # Restore original batch order (GIỐNG repo)
+        # Restore original batch order
         # ------------------------------------------------
         preds = torch.cat(preds, dim=0).argmax(dim=-1)
         exited_step_indices = torch.tensor(
@@ -246,8 +215,6 @@ class TinyRecursiveModel(Module):
         x = self.patch_embed(images)           # (B, N, D)
         cls = self.cls_token.repeat(B, 1, 1)
         inputs = torch.cat([cls, x], dim=1)    # (B, N+1, D)
-        # outputs, latents = self.get_initial() # (B, 1, D)
-        # inputs, packed_shape = self.embed_inputs_with_registers(seq)
 
         outputs, latents = self.deep_refinement(inputs, outputs, latents)
         cls_out = outputs[:, 0] 
@@ -266,38 +233,3 @@ class TinyRecursiveModel(Module):
 
         total_loss = cls_loss + halt_loss * self.halt_loss_weight
         return total_loss, cls_loss, halt_loss, logits, halt_logits.sigmoid()
-
-        # registers, outputs_for_pred = unpack(outputs, packed_shape, 'b * d')
-
-        # pred = self.to_pred(outputs_for_pred)
-
-        # halt_logits = self.to_halt_pred(outputs)
-
-        # halt_prob = halt_logits.sigmoid()
-
-        # outputs, latents = outputs.detach(), latents.detach()
-
-        # return_package = (outputs, latents, pred, halt_prob)
-
-        # if not exists(labels):
-        #     return return_package
-
-        # # calculate loss if labels passed in
-
-        # loss = F.cross_entropy(rearrange(pred, 'b n l -> b l n'), labels, reduction = 'none')
-        # loss = reduce(loss, 'b ... -> b', 'mean')
-
-        # is_all_correct = (pred.argmax(dim = -1) == labels).all(dim = -1)
-
-        # halt_loss = F.binary_cross_entropy_with_logits(halt_logits, is_all_correct.float(), reduction = 'none')
-
-        # # total loss and loss breakdown
-
-        # total_loss = (
-        #     loss +
-        #     halt_loss * self.halt_loss_weight
-        # )
-
-        # losses = (loss, halt_loss)
-
-        # return (total_loss.sum(), losses, *return_package)
