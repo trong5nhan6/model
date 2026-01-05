@@ -87,24 +87,40 @@ def classification_metrics(logits: torch.Tensor, labels: torch.Tensor, num_class
 def evaluate(model, dataloader, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model = model.to(device)
     model.eval()
 
-    all_logits = []
+    all_preds = []
     all_labels = []
+    all_exit_steps = []
 
     for images, labels in dataloader:
         images = images.to(device)
         labels = labels.to(device)
 
-        outputs, *_ = model(images)
-        all_logits.append(outputs)
+        # 🔥 predict trả về FINAL prediction của mỗi sample
+        preds, exit_steps = model.predict(
+            images,
+            halt_prob_thres=model.halt_prob_thres,
+            max_deep_refinement_steps=model.max_deep_refinement_steps
+        )
+
+        all_preds.append(preds)
         all_labels.append(labels)
+        all_exit_steps.append(exit_steps)
 
-    all_logits = torch.cat(all_logits, dim=0)
+    all_preds = torch.cat(all_preds, dim=0)
     all_labels = torch.cat(all_labels, dim=0)
+    all_exit_steps = torch.cat(all_exit_steps, dim=0)
 
-    metrics = classification_metrics(all_logits, all_labels, model.num_classes)
+    metrics = compute_metrics_from_preds(
+        preds=all_preds,
+        labels=all_labels,
+        exit_steps=all_exit_steps,
+        num_classes=model.num_classes
+    )
+
     return metrics
 # trainer
 
@@ -237,7 +253,8 @@ class Trainer(Module):
                         break
 
                     total_loss, cls_loss, halt_loss, logits, halt_probs = \
-                        self.model(active_images, outputs, latents, labels=active_labels)
+                        self.model(active_images, outputs,
+                                   latents, labels=active_labels)
 
                     self.accelerator.backward(total_loss)
                     self.optim.step()
@@ -285,8 +302,9 @@ class Trainer(Module):
                     epoch_cls += torch.stack(step_cls_losses).mean().item()
                     epoch_halt += torch.stack(step_halt_losses).mean().item()
                     epoch_active += sum(step_active) / len(step_active)
-                    epoch_halt_prob += torch.stack(step_halt_probs).mean().item()
-                    epoch_batches += 1  
+                    epoch_halt_prob += torch.stack(
+                        step_halt_probs).mean().item()
+                    epoch_batches += 1
 
             # ====== TRAIN LOG (ONCE / EPOCH) ======
             if self.accelerator.is_main_process:
