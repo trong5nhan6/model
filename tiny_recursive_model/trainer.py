@@ -84,7 +84,7 @@ def classification_metrics(logits: torch.Tensor, labels: torch.Tensor, num_class
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, device=None):
+def evaluate(model, dataloader, halt_prob_thres=0.7, max_deep_refinement_steps=6, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -101,8 +101,8 @@ def evaluate(model, dataloader, device=None):
 
         preds, exit_steps = model.predict(
             images,
-            halt_prob_thres=model.halt_prob_thres,
-            max_deep_refinement_steps=model.max_deep_refinement_steps
+            halt_prob_thres=halt_prob_thres,
+            max_deep_refinement_steps=max_deep_refinement_steps
         )
 
         all_preds.append(preds)
