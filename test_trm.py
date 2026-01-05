@@ -16,8 +16,8 @@ if __name__ == "__main__":
     IMG_SIZE = 224
     PATCH_SIZE = 16
     IN_CHANS = 3
-    DIM = 128
-    NUM_CLASSES = 10
+    DIM = 512
+    NUM_CLASSES = 257
 
     trans = TransformerEncoder(
     dim=DIM,
@@ -60,11 +60,14 @@ if __name__ == "__main__":
     # =========================
     # forward test (with loss)
     # =========================
-    loss, cls_loss, halt_loss = model(images, labels)
+    loss, cls_loss, halt_loss, logits, halt_prob = model(images, labels)
 
     print("total loss:", loss.item())
     print("cls loss:", cls_loss.item())
     print("halt loss:", halt_loss.item())
-
+    print("logits:", logits.shape)
+    print("logits:", logits)
+    print("halt_prob:", halt_prob.shape)
+    print("halt_prob:", halt_prob)
     print(model)
     print_model_params(model)
