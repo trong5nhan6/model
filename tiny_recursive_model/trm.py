@@ -143,73 +143,94 @@ class TinyRecursiveModel(Module):
     @torch.no_grad()
     def predict(
         self,
-        seq,
-        halt_prob_thres = 0.5, # threshold for halting
-        max_deep_refinement_steps = 12 # maximum number of refinement steps
+        images,
+        halt_prob_thres=0.5,
+        max_deep_refinement_steps=12
     ):
-        batch = seq.shape[0] # number of sequences in the batch
+        """
+        images: (B, C, H, W)
 
-        inputs, packed_shape = self.embed_inputs_with_registers(seq) #(b n+n' d)
+        return:
+            preds: (B,)
+            exited_step_indices: (B,)
+        """
+        self.eval()
 
-        # initial outputs and latents
+        device = images.device
+        batch = images.size(0)
 
-        outputs, latents = self.get_initial() # (d)
+        # ------------------------------------------------
+        # Embed inputs (same logic as forward)
+        # ------------------------------------------------
+        x = self.patch_embed(images)                  # (B, N, D)
+        cls = self.cls_token.expand(batch, -1, -1)    # (B, 1, D)
+        inputs = torch.cat([cls, x], dim=1)           # (B, N+1, D)
 
-        # active batch indices, the step it exited at, and the final output predictions
+        # ------------------------------------------------
+        # Initial outputs and latents
+        # ------------------------------------------------
+        outputs, latents = self.get_initial()
+        # outputs = outputs.expand(batch, -1, -1)
+        # latents = latents.expand(batch, -1, -1)
 
-        active_batch_indices = arange(batch, device = self.device, dtype = torch.float32) # [0., 1., 2., 3.]
+        # ------------------------------------------------
+        # ACT bookkeeping (GIỐNG repo)
+        # ------------------------------------------------
+        active_batch_indices = torch.arange(batch, device=device, dtype=torch.long)
 
         preds = []
-        exited_step_indices = [] # lưu step nào dung ở step này
-        exited_batch_indices = [] # lưu batch nao dung ở step này
+        exited_step_indices = []
+        exited_batch_indices = []
 
-        for step in range_from_one(max_deep_refinement_steps):
+        # ------------------------------------------------
+        # ACT loop
+        # ------------------------------------------------
+        for step in range(1, max_deep_refinement_steps + 1):
             is_last = step == max_deep_refinement_steps
 
             outputs, latents = self.deep_refinement(inputs, outputs, latents)
 
-            halt_prob = self.to_halt_pred(outputs).sigmoid() # (b)
+            cls_out = outputs[:, 0]                            # (b, D)
+            logits = self.to_pred(cls_out)                     # (b, num_classes)
+            halt_prob = self.to_halt_pred(cls_out).sigmoid().squeeze(-1)
 
             should_halt = (halt_prob >= halt_prob_thres) | is_last
 
             if not should_halt.any():
                 continue
 
-            # maybe remove registers
-
-            registers, outputs_for_pred = unpack(outputs, packed_shape, 'b * d')
-
-            # append to exited predictions
-
-            pred = self.to_pred(outputs_for_pred[should_halt])
-            preds.append(pred)
-
-            # append the step at which early halted
-
-            exited_step_indices.extend([step] * should_halt.sum().item()) # biết step này có bao nhieu batch halt
-
-            # append indices for sorting back
-
-            exited_batch_indices.append(active_batch_indices[should_halt])  # biết batch nao dung ở step này
+            # ------------------------------------------------
+            # Collect predictions (GIỐNG repo)
+            # ------------------------------------------------
+            preds.append(logits[should_halt])
+            exited_step_indices.extend([step] * should_halt.sum().item())
+            exited_batch_indices.append(active_batch_indices[should_halt])
 
             if is_last:
                 continue
 
-            # ready for next round
+            # ------------------------------------------------
+            # Remove halted samples
+            # ------------------------------------------------
+            keep = ~should_halt
+            inputs = inputs[keep]
+            outputs = outputs[keep]
+            latents = latents[keep]
+            active_batch_indices = active_batch_indices[keep]
 
-            inputs = inputs[~should_halt] # (b n+n' d) should_halt-(b) True dung False conti
-            outputs = outputs[~should_halt]
-            latents = latents[~should_halt]
-            active_batch_indices = active_batch_indices[~should_halt]
-
-            if is_empty(outputs):
+            if inputs.numel() == 0:
                 break
 
-        preds = cat(preds).argmax(dim = -1)
-        exited_step_indices = tensor(exited_step_indices)
+        # ------------------------------------------------
+        # Restore original batch order (GIỐNG repo)
+        # ------------------------------------------------
+        preds = torch.cat(preds, dim=0).argmax(dim=-1)
+        exited_step_indices = torch.tensor(
+            exited_step_indices, device=device, dtype=torch.long
+        )
 
-        exited_batch_indices = cat(exited_batch_indices)
-        sort_indices = exited_batch_indices.argsort(dim = -1) #(tensor([1, 0, 2, 3])) sắp xếp theo batch index 0 1 2 3
+        exited_batch_indices = torch.cat(exited_batch_indices, dim=0)
+        sort_indices = exited_batch_indices.argsort(dim=-1)
 
         return preds[sort_indices], exited_step_indices[sort_indices]
 
