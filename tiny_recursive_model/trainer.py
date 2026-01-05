@@ -99,7 +99,6 @@ def evaluate(model, dataloader, device=None):
         images = images.to(device)
         labels = labels.to(device)
 
-        # 🔥 predict trả về FINAL prediction của mỗi sample
         preds, exit_steps = model.predict(
             images,
             halt_prob_thres=model.halt_prob_thres,
@@ -219,10 +218,9 @@ class Trainer(Module):
         all_labels = torch.cat(all_labels, dim=0)
         all_exit_steps = torch.cat(all_exit_steps, dim=0)
 
-        metrics = compute_metrics_from_preds(
+        metrics = classification_metrics(
             preds=all_preds,
             labels=all_labels,
-            exit_steps=all_exit_steps,
             num_classes=self.model.num_classes
         )
 
