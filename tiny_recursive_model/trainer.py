@@ -195,24 +195,40 @@ class Trainer(Module):
 
     def evaluate(self):
         self.model.eval()
-        all_logits = []
+
+        all_preds = []
         all_labels = []
+        all_exit_steps = []
+
         with torch.no_grad():
             for images, labels in self.val_loader:
                 images = images.to(self.model.device, non_blocking=True)
                 labels = labels.to(self.model.device, non_blocking=True)
 
-                logits, *_ = self.model(images)
-                all_logits.append(logits.cpu())
+                preds, exit_steps = self.model.predict(
+                    images,
+                    halt_prob_thres=self.halt_prob_thres,
+                    max_deep_refinement_steps=self.max_recurrent_steps
+                )
+
+                all_preds.append(preds.cpu())
                 all_labels.append(labels.cpu())
+                all_exit_steps.append(exit_steps.cpu())
 
-        all_logits = torch.cat(all_logits, dim=0)
+        all_preds = torch.cat(all_preds, dim=0)
         all_labels = torch.cat(all_labels, dim=0)
-        metrics = classification_metrics(
-            all_logits, all_labels, self.model.num_classes)
+        all_exit_steps = torch.cat(all_exit_steps, dim=0)
 
-        del all_logits, all_labels
+        metrics = compute_metrics_from_preds(
+            preds=all_preds,
+            labels=all_labels,
+            exit_steps=all_exit_steps,
+            num_classes=self.model.num_classes
+        )
+
+        del all_preds, all_labels, all_exit_steps
         torch.cuda.empty_cache()
+
         return metrics
 
     def forward(self):
