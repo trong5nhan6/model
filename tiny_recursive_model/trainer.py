@@ -219,7 +219,7 @@ class Trainer(Module):
         all_exit_steps = torch.cat(all_exit_steps, dim=0)
 
         metrics = classification_metrics(
-            preds=all_preds,
+            logits=all_preds,
             labels=all_labels,
             num_classes=self.model.num_classes
         )
