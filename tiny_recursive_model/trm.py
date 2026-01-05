@@ -66,10 +66,10 @@ class TinyRecursiveModel(Module):
         # self.register_tokens = nn.Parameter(torch.randn(num_register_tokens, dim) * 1e-2)
 
         # prediction heads
-        self. = nn.Linear(dim, num_classes)
+        self.to_pred = nn.Linear(dim, num_classes)
         self.to_halt_pred = nn.Linear(dim, 1)
 
-        # self.to_pto_predred = nn.Linear(dim, num_tokens, bias = False)
+        # self.to_pred = nn.Linear(dim, num_tokens, bias = False)
         # self.to_halt_pred = nn.Sequential(
         #     Reduce('b n d -> b d', 'mean'),
         #     nn.Linear(dim, 1, bias = False),
