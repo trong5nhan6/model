@@ -158,13 +158,18 @@ class TinyRecursiveModel(Module):
         for step in range(1, max_deep_refinement_steps + 1):
             is_last = step == max_deep_refinement_steps
 
-            outputs, latents = self.deep_refinement(inputs, outputs, latents)
+            outputs, latents = self.deep_refinement(inputs, outputs, latents) # (b, 1, d), (b, 1, d)
+            # print("After deep_refinement:")
+            # print("outputs.shape:", outputs.shape)
+            # print("latents.shape:", latents.shape)
+            # print("inputs.shape:", inputs.shape)
+            # print("active_batch_indices.shape:", active_batch_indices.shape)
 
             cls_out = outputs[:, 0]                            # (b, D)
             logits = self.to_pred(cls_out)                     # (b, num_classes)
-            halt_prob = self.to_halt_pred(cls_out).sigmoid().squeeze(-1)
+            halt_prob = self.to_halt_pred(cls_out).sigmoid().squeeze(-1) # (b,)
 
-            should_halt = (halt_prob >= halt_prob_thres) | is_last
+            should_halt = (halt_prob >= halt_prob_thres) | is_last # (b,)
 
             if not should_halt.any():
                 continue
@@ -182,6 +187,11 @@ class TinyRecursiveModel(Module):
             # ------------------------------------------------
             # Remove halted samples
             # ------------------------------------------------
+            print("outputs.shape:", outputs.shape, "device:", outputs.device)
+            print("latents.shape:", latents.shape, "device:", latents.device)
+            print("inputs.shape:", inputs.shape, "device:", inputs.device)
+            print("active_batch_indices.shape:", active_batch_indices.shape)
+  
             inputs = inputs[~should_halt]
             outputs = outputs[~should_halt]
             latents = latents[~should_halt]
@@ -213,8 +223,8 @@ class TinyRecursiveModel(Module):
         B = images.size(0)
 
         x = self.patch_embed(images)           # (B, N, D)
-        cls = self.cls_token.repeat(B, 1, 1)
-        inputs = torch.cat([cls, x], dim=1)    # (B, N+1, D)
+        cls_token = self.cls_token.repeat(B, 1, 1)
+        inputs = torch.cat([cls_token, x], dim=1)    # (B, N+1, D)
 
         outputs, latents = self.deep_refinement(inputs, outputs, latents)
         cls_out = outputs[:, 0] 
