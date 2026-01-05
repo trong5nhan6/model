@@ -216,8 +216,8 @@ class TinyRecursiveModel(Module):
     def forward(
         self,
         images,
-        # outputs,
-        # latents,
+        outputs,
+        latents,
         labels = None
     ):
         B = images.size(0)
@@ -225,7 +225,7 @@ class TinyRecursiveModel(Module):
         x = self.patch_embed(images)           # (B, N, D)
         cls = self.cls_token.repeat(B, 1, 1)
         inputs = torch.cat([cls, x], dim=1)    # (B, N+1, D)
-        outputs, latents = self.get_initial() # (B, 1, D)
+        # outputs, latents = self.get_initial() # (B, 1, D)
         # inputs, packed_shape = self.embed_inputs_with_registers(seq)
 
         outputs, latents = self.deep_refinement(inputs, outputs, latents)

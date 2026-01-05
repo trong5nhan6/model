@@ -230,14 +230,22 @@ class Trainer(Module):
                 step_active = []
                 step_halt_probs = []
 
+                outputs, latents = self.model.get_initial()
+
                 for t in range(self.max_recurrent_steps):
                     if active_images.numel() == 0:
                         break
 
                     total_loss, cls_loss, halt_loss, logits, halt_probs = \
-                        self.model(active_images, labels=active_labels)
+                        self.model(active_images, outputs, latents, labels=active_labels)
 
                     self.accelerator.backward(total_loss)
+                    self.optim.step()
+                    self.optim.zero_grad()
+                    self.scheduler.step()
+
+                    if exists(self.ema_model) and self.accelerator.is_main_process:
+                        self.ema_model.update()
 
                     # collect stats
                     step_losses.append(total_loss.detach())
@@ -259,17 +267,17 @@ class Trainer(Module):
                     # -------- HALTING --------
                     halt_mask = halt_probs >= self.halt_prob_thres
 
+                    if not halt_mask.any():
+                        continue
+
                     # remove halted samples
+                    outputs = outputs[~halt_mask]
+                    latents = latents[~halt_mask]
                     active_images = active_images[~halt_mask]
                     active_labels = active_labels[~halt_mask]
 
-
-                self.optim.step()
-                self.optim.zero_grad()
-                self.scheduler.step()
-
-                if exists(self.ema_model) and self.accelerator.is_main_process:
-                    self.ema_model.update()
+                    if is_empty(outputs):
+                        break
 
                 # ====== ACCUMULATE EPOCH STATS ======
                 if len(step_losses) > 0:
