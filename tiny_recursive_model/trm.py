@@ -228,6 +228,11 @@ class TinyRecursiveModel(Module):
         inputs = torch.cat([cls_token, x], dim=1)    # (B, N+1, D)
 
         outputs, latents = self.deep_refinement(inputs, outputs, latents)
+
+        print('outputs shape', outputs.shape)
+        print('latents shape', latents.shape)
+        print('inputs shape', inputs.shape)
+        
         cls_out = outputs[:, 0] 
         logits = self.to_pred(cls_out)         # (B, num_classes)
         halt_logits = self.to_halt_pred(cls_out).squeeze(-1)
