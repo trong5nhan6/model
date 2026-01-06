@@ -292,6 +292,13 @@ class Trainer(Module):
                     # -------- HALTING --------
                     halt_mask = halt_probs >= self.halt_prob_thres
 
+                    print('halt_prob', halt_prob)
+                    print('halt_prob shape', halt_prob.shape)
+                    print("outputs.shape:", outputs.shape, "device:", outputs.device)
+                    print("latents.shape:", latents.shape, "device:", latents.device)
+                    print("inputs.shape:", inputs.shape, "device:", inputs.device)
+                    print("active_batch_indices.shape:", active_batch_indices.shape)
+
                     if not halt_mask.any():
                         continue
 
