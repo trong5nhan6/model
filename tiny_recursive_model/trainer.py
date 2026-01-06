@@ -296,7 +296,7 @@ class Trainer(Module):
                     print('halt_prob shape', halt_probs.shape)
                     print("outputs.shape:", outputs.shape, "device:", outputs.device)
                     print("latents.shape:", latents.shape, "device:", latents.device)
-                    print("inputs.shape:", inputs.shape, "device:", inputs.device)
+                    print("active_images.shape:", active_images.shape, "device:", active_images.device)
                     print("active_batch_indices.shape:", active_batch_indices.shape)
 
                     if not halt_mask.any():
