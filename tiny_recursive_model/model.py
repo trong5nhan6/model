@@ -274,7 +274,7 @@ if __name__ == '__main__':
     print("Output shape:", out.shape)
 
     assert out.shape == x.shape
-    print("✅ Attention output shape correct")
+    print("Attention output shape correct")
 
     # ---- test Attention with mask ----
     mask = torch.ones(B, N, dtype=torch.bool)
@@ -286,7 +286,7 @@ if __name__ == '__main__':
     print("Output shape:", out_masked.shape)
 
     assert out_masked.shape == x.shape
-    print("✅ Attention mask works")
+    print("Attention mask works")
 
 
     mlp = Mlp(
@@ -302,4 +302,4 @@ if __name__ == '__main__':
     print("Output shape:", out.shape)
 
     assert out.shape == x.shape
-    print("✅ MLP output shape correct")
+    print("MLP output shape correct")

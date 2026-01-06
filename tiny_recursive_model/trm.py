@@ -157,7 +157,6 @@ class TinyRecursiveModel(Module):
         # ACT loop
         # ------------------------------------------------
         for step in range(1, max_deep_refinement_steps + 1):
-            print("step:", step)
             is_last = step == max_deep_refinement_steps
 
             outputs, latents = self.deep_refinement(inputs, outputs, latents) # (b, n+1, d), (b, n+1, d)
@@ -183,8 +182,6 @@ class TinyRecursiveModel(Module):
             # ------------------------------------------------
             # Remove halted samples
             # ------------------------------------------------
-
-  
             inputs = inputs[~should_halt]
             outputs = outputs[~should_halt]
             latents = latents[~should_halt]
