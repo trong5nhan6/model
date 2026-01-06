@@ -63,8 +63,8 @@ class TinyRecursiveModel(Module):
         self.halt_loss_weight = halt_loss_weight
 
         # init
-        nn.init.uniform_(self.to_halt_pred.weight, a=0.0, b=1.0)
-        # nn.init.zeros_(self.to_halt_pred.weight)
+        # nn.init.uniform_(self.to_halt_pred.weight, a=0.0, b=1.0)
+        nn.init.zeros_(self.to_halt_pred.weight)
 
     @property
     def device(self):
