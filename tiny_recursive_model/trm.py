@@ -63,7 +63,8 @@ class TinyRecursiveModel(Module):
         self.halt_loss_weight = halt_loss_weight
 
         # init
-        nn.init.zeros_(self.to_halt_pred.weight)
+        nn.init.uniform_(self.to_halt_pred.weight, a=0.0, b=1.0)
+        # nn.init.zeros_(self.to_halt_pred.weight)
 
     @property
     def device(self):
@@ -144,7 +145,7 @@ class TinyRecursiveModel(Module):
         outputs, latents = self.get_initial()
 
         # ------------------------------------------------
-        # ACT bookkeeping (GIỐNG repo)
+        # ACT bookkeeping
         # ------------------------------------------------
         active_batch_indices = torch.arange(batch, device=device, dtype=torch.long)
 
@@ -156,26 +157,29 @@ class TinyRecursiveModel(Module):
         # ACT loop
         # ------------------------------------------------
         for step in range(1, max_deep_refinement_steps + 1):
+            print("step:", step)
             is_last = step == max_deep_refinement_steps
 
-            outputs, latents = self.deep_refinement(inputs, outputs, latents) # (b, 1, d), (b, 1, d)
-            # print("After deep_refinement:")
-            # print("outputs.shape:", outputs.shape)
-            # print("latents.shape:", latents.shape)
-            # print("inputs.shape:", inputs.shape)
-            # print("active_batch_indices.shape:", active_batch_indices.shape)
-
-            cls_out = outputs[:, 0]                            # (b, D)
+            outputs, latents = self.deep_refinement(inputs, outputs, latents) # (b, n+1, d), (b, n+1, d)
+            cls_out = outputs[:, 0]                          # (b, D)
             logits = self.to_pred(cls_out)                     # (b, num_classes)
             halt_prob = self.to_halt_pred(cls_out).sigmoid().squeeze(-1) # (b,)
 
             should_halt = (halt_prob >= halt_prob_thres) | is_last # (b,)
 
+            print('halt_prob', halt_prob)
+            print('halt_prob shape', halt_prob.shape)
+            print("outputs.shape:", outputs.shape, "device:", outputs.device)
+            print("latents.shape:", latents.shape, "device:", latents.device)
+            print("inputs.shape:", inputs.shape, "device:", inputs.device)
+            print("active_batch_indices.shape:", active_batch_indices.shape)
+
+
             if not should_halt.any():
                 continue
 
             # ------------------------------------------------
-            # Collect predictions (GIỐNG repo)
+            # Collect predictions
             # ------------------------------------------------
             preds.append(logits[should_halt])
             exited_step_indices.extend([step] * should_halt.sum().item())
@@ -187,10 +191,7 @@ class TinyRecursiveModel(Module):
             # ------------------------------------------------
             # Remove halted samples
             # ------------------------------------------------
-            print("outputs.shape:", outputs.shape, "device:", outputs.device)
-            print("latents.shape:", latents.shape, "device:", latents.device)
-            print("inputs.shape:", inputs.shape, "device:", inputs.device)
-            print("active_batch_indices.shape:", active_batch_indices.shape)
+
   
             inputs = inputs[~should_halt]
             outputs = outputs[~should_halt]
