@@ -293,7 +293,7 @@ class Trainer(Module):
                     halt_mask = halt_probs >= self.halt_prob_thres
 
                     print('halt_prob', halt_probs)
-                    print('halt_prob shape', halt_prob.shape)
+                    print('halt_prob shape', halt_probs.shape)
                     print("outputs.shape:", outputs.shape, "device:", outputs.device)
                     print("latents.shape:", latents.shape, "device:", latents.device)
                     print("inputs.shape:", inputs.shape, "device:", inputs.device)
