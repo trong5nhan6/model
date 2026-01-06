@@ -38,6 +38,9 @@ def exists(v):
 def range_from_one(n):
     return range(1, n + 1)
 
+
+def is_empty(t):
+    return t.numel() == 0
 # metric helpers
 
 
@@ -296,10 +299,10 @@ class Trainer(Module):
                         continue
 
                     # remove halted samples
-                    outputs = outputs[~halt_mask] # (B, 1, D)
-                    latents = latents[~halt_mask] # (B, 1, D)
-                    active_images = active_images[~halt_mask] # (B, C, H, W)
-                    active_labels = active_labels[~halt_mask] # (B,)
+                    outputs = outputs[~halt_mask]  # (B, 1, D)
+                    latents = latents[~halt_mask]  # (B, 1, D)
+                    active_images = active_images[~halt_mask]  # (B, C, H, W)
+                    active_labels = active_labels[~halt_mask]  # (B,)
 
                     if is_empty(outputs):
                         break
