@@ -260,7 +260,7 @@ class Trainer(Module):
                     if active_images.numel() == 0:
                         break
 
-                    total_loss, cls_loss, halt_loss, logits, halt_probs = \
+                    total_loss, cls_loss, halt_loss, logits, halt_probs, outputs, latents = \
                         self.model(active_images, outputs,
                                    latents, labels=active_labels)
 
@@ -291,12 +291,6 @@ class Trainer(Module):
 
                     # -------- HALTING --------
                     halt_mask = halt_probs >= self.halt_prob_thres
-
-                    print('halt_prob', halt_probs)
-                    print('halt_prob shape', halt_probs.shape)
-                    print("outputs.shape:", outputs.shape, "device:", outputs.device)
-                    print("latents.shape:", latents.shape, "device:", latents.device)
-                    print("active_images.shape:", active_images.shape, "device:", active_images.device)
 
                     if not halt_mask.any():
                         continue

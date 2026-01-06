@@ -12,12 +12,12 @@ def print_model_params(model):
     print(f"Total trainable params: {total:,}")
 
 if __name__ == "__main__":
-    B = 32
+    B = 128
     IMG_SIZE = 224
     PATCH_SIZE = 16
     IN_CHANS = 3
     DIM = 512
-    NUM_CLASSES = 257
+    NUM_CLASSES = 10
 
     trans = TransformerEncoder(
     dim=DIM,
@@ -44,38 +44,42 @@ if __name__ == "__main__":
     num_latent_refinements=6
     )
     model.eval()
-    
+
+    torch.manual_seed(42)
     images = torch.randn(B, IN_CHANS, IMG_SIZE, IMG_SIZE)
     labels = torch.randint(0, NUM_CLASSES, (B,))
 
-    # outputs, latents = model.get_initial()
+    outputs, latents = model.get_initial()
 
-    # with torch.no_grad():
-    #     logits, halt_prob = model(images, outputs, latents)
+    with torch.no_grad():
+        logits, halt_prob = model(images, outputs, latents)
 
-    # print("logits:", logits.shape)        # (B, num_classes)
-    # print("logits:", logits)
-    # print("halt_prob:", halt_prob.shape)  # (B,)
-    # print("halt_prob:", halt_prob)
+    print("logits:", logits.shape)        # (B, num_classes)
+    print("logits:", logits)
+    print("halt_prob:", halt_prob.shape)  # (B,)
+    print("halt_prob:", halt_prob)
 
-    # # =========================
-    # # forward test (with loss)
-    # # =========================
-    # loss, cls_loss, halt_loss, logits, halt_prob = model(images, outputs, latents, labels)
+    # =========================
+    # forward test (with loss)
+    # =========================
+    loss, cls_loss, halt_loss, logits, halt_prob = model(images, outputs, latents, labels)
 
-    # print("total loss:", loss.item())
-    # print("cls loss:", cls_loss.item())
-    # print("halt loss:", halt_loss.item())
-    # print("logits:", logits.shape)
-    # print("logits:", logits)
-    # print("halt_prob:", halt_prob.shape)
-    # print("halt_prob:", halt_prob)
+    print("total loss:", loss.item())
+    print("cls loss:", cls_loss.item())
+    print("halt loss:", halt_loss.item())
+    print("logits:", logits.shape)
+    print("logits:", logits)
+    print("halt_prob:", halt_prob.shape)
+    print("halt_prob:", halt_prob)
 
-    out_predicted, exit_indices = model.predict(images, halt_prob_thres=0.7, max_deep_refinement_steps=6)
-    # print("out_predicted:", out_predicted.shape)
-    # print("out_predicted:", out_predicted)
-    # print("exit_indices:", exit_indices.shape)
-    # print("exit_indices:", exit_indices)
+    print("images:", images.shape)
+    print("images:", images)
 
-    # print(model)
-    # print_model_params(model)
+    out_predicted, exit_indices = model.predict(images, halt_prob_thres=0.5, max_deep_refinement_steps=6)
+    print("out_predicted:", out_predicted.shape)
+    print("out_predicted:", out_predicted)
+    print("exit_indices:", exit_indices.shape)
+    print("exit_indices:", exit_indices)
+
+    print(model)
+    print_model_params(model)

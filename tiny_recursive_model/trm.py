@@ -167,14 +167,6 @@ class TinyRecursiveModel(Module):
 
             should_halt = (halt_prob >= halt_prob_thres) | is_last # (b,)
 
-            print('halt_prob', halt_prob)
-            print('halt_prob shape', halt_prob.shape)
-            print("outputs.shape:", outputs.shape, "device:", outputs.device)
-            print("latents.shape:", latents.shape, "device:", latents.device)
-            print("inputs.shape:", inputs.shape, "device:", inputs.device)
-            print("active_batch_indices.shape:", active_batch_indices.shape)
-
-
             if not should_halt.any():
                 continue
 
@@ -229,10 +221,6 @@ class TinyRecursiveModel(Module):
 
         outputs, latents = self.deep_refinement(inputs, outputs, latents)
 
-        print('outputs shape', outputs.shape)
-        print('latents shape', latents.shape)
-        print('inputs shape', inputs.shape)
-        
         cls_out = outputs[:, 0] 
         logits = self.to_pred(cls_out)         # (B, num_classes)
         halt_logits = self.to_halt_pred(cls_out).squeeze(-1)
@@ -248,4 +236,4 @@ class TinyRecursiveModel(Module):
         )
 
         total_loss = cls_loss + halt_loss * self.halt_loss_weight
-        return total_loss, cls_loss, halt_loss, logits, halt_logits.sigmoid()
+        return total_loss, cls_loss, halt_loss, logits, halt_logits.sigmoid(), outputs, latents
